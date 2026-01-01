@@ -26,7 +26,7 @@ export const useAudio = (
   const cycleLengthRef = useRef(16);
   const tracksRef = useRef<Track[]>(tracks);
   const transportRef = useRef<TransportState>(transport);
-  const onStepChangeRef = useRef<(step: number) => void | undefined>(onStepChange);
+  const onStepChangeRef = useRef<((step: number) => void) | undefined>(onStepChange);
 
   const isPlayingRef = useRef(false);
   const currentStepRef = useRef(0);
