@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / editor
+.DS_Store
+*.log
+*.env
+.env.local
+.vscode/
+
+# Coverage / tests (currently removed)
+coverage/
+.nyc_output/
