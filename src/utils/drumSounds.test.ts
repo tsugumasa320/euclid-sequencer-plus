@@ -66,7 +66,10 @@ vi.mock('tone', () => {
     }),
     Filter: vi.fn(() => new MockFilter()),
     now: vi.fn(() => nowValue),
-    Offline: vi.fn((callback: any, duration: number) => {
+    Draw: {
+      schedule: vi.fn((callback: () => void) => callback())
+    },
+    Offline: vi.fn((callback: any, _duration: number) => {
       const buffer = {
         getChannelData: vi.fn(() => new Float32Array([0.1, 0.2, 0.3])),
       };
@@ -95,7 +98,7 @@ describe('DrumMachine', () => {
     expect(Tone.NoiseSynth).toHaveBeenCalledTimes(4); // snare, hihat, crash, clap
     expect(Tone.Gain).toHaveBeenCalledTimes(7); // 6 per-track + master
 
-    const gainCalls = (Tone.Gain as vi.Mock).mock.calls.map(([value]) => value);
+    const gainCalls = (Tone.Gain as any).mock.calls.map(([value]: [any]) => value);
     expect(gainCalls).toEqual(expect.arrayContaining([0.8, 0.9, 0.8, 0.5, 0.2, 0.7, 0.6]));
   });
 

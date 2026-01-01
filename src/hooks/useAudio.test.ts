@@ -3,7 +3,6 @@ import { renderHook } from '@testing-library/react';
 import { act } from 'react';
 import { useAudio } from './useAudio';
 import { Track, TransportState } from '../types';
-import { generateEuclidPattern } from '../utils/euclidAlgorithm';
 
 // Hoisted mocks so vi.mock can reference them
 const toneMocks = vi.hoisted(() => {
@@ -36,6 +35,9 @@ const drumMocks = vi.hoisted(() => {
 vi.mock('tone', () => ({
   start: toneMocks.start,
   now: toneMocks.nowFn,
+  Draw: {
+    schedule: vi.fn((callback: () => void) => callback())
+  },
   Transport: {
     bpm: { value: 120 },
     swing: 0,

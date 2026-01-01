@@ -99,6 +99,19 @@ const defaultTransport = {
 
 const defaultMasterVolume = 80;
 
+const timeSignatureToSteps = (timeSignature: string): number => {
+  const [numeratorStr, denominatorStr] = timeSignature.split('/');
+  const numerator = parseInt(numeratorStr, 10);
+  const denominator = parseInt(denominatorStr, 10);
+
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
+    return 16;
+  }
+
+  const stepsPerBeat = Math.max(1, Math.floor(16 / denominator));
+  return Math.max(1, numerator * stepsPerBeat);
+};
+
 function App() {
   const [appState, setAppState] = useState<AppState>(() => {
     const tracksWithPatterns = initialTracks.map(track => ({
@@ -149,10 +162,37 @@ function App() {
   }, []);
 
   const updateTransport = useCallback((updates: Partial<typeof appState.transport>) => {
-    setAppState(prev => ({
-      ...prev,
-      transport: { ...prev.transport, ...updates }
-    }));
+    setAppState(prev => {
+      const nextTransport = { ...prev.transport, ...updates };
+      let nextTracks = prev.tracks;
+
+      if (updates.timeSignature && updates.timeSignature !== prev.transport.timeSignature) {
+        const steps = timeSignatureToSteps(updates.timeSignature);
+        nextTracks = prev.tracks.map(track => {
+          const scaledHits = Math.min(steps, Math.round(track.hits * (steps / track.steps)));
+          const scaledRotation = Math.round(track.rotation * (steps / track.steps));
+          const updated = {
+            ...track,
+            steps,
+            hits: scaledHits,
+            rotation: scaledRotation
+          };
+          updated.pattern = generateEuclidPattern({
+            steps: updated.steps,
+            hits: updated.hits,
+            bias: updated.bias,
+            rotation: updated.rotation
+          });
+          return updated;
+        });
+      }
+
+      return {
+        ...prev,
+        transport: nextTransport,
+        tracks: nextTracks
+      };
+    });
   }, []);
 
   const handleMasterVolumeChange = useCallback((volume: number) => {
@@ -178,25 +218,33 @@ function App() {
     updateTransport({ isPlaying: true });
   }, [appState.transport.isPlaying, audio, updateTransport]);
 
-  // Handle tempo changes
+  // Handle tempo changes (only after audio is ready)
   useEffect(() => {
-    audio.updateTempo(appState.transport.bpm);
-  }, [appState.transport.bpm, audio]);
+    if (audio.isReady) {
+      audio.updateTempo(appState.transport.bpm);
+    }
+  }, [appState.transport.bpm, audio, audio.isReady]);
 
-  // Handle swing changes
+  // Handle swing changes (only after audio is ready)
   useEffect(() => {
-    audio.updateSwing(appState.transport.swing);
-  }, [appState.transport.swing, audio]);
+    if (audio.isReady) {
+      audio.updateSwing(appState.transport.swing);
+    }
+  }, [appState.transport.swing, audio, audio.isReady]);
 
-  // Handle master volume changes
+  // Handle master volume changes (only after audio is ready)
   useEffect(() => {
-    audio.updateMasterVolume(appState.masterVolume);
-  }, [appState.masterVolume, audio]);
+    if (audio.isReady) {
+      audio.updateMasterVolume(appState.masterVolume);
+    }
+  }, [appState.masterVolume, audio, audio.isReady]);
 
-  // Handle time signature changes
+  // Handle time signature changes (only after audio is ready)
   useEffect(() => {
-    audio.updateTimeSignature(appState.transport.timeSignature);
-  }, [appState.transport.timeSignature, audio]);
+    if (audio.isReady) {
+      audio.updateTimeSignature(appState.transport.timeSignature);
+    }
+  }, [appState.transport.timeSignature, audio, audio.isReady]);
 
   const selectedTrack = useMemo(() => 
     appState.tracks.find(t => t.id === appState.selectedTrackId), 

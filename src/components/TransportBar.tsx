@@ -84,10 +84,8 @@ const TransportBar: React.FC<TransportBarProps> = ({
         <div className="time-signature-control">
           <label>Time</label>
           <select value={transport.timeSignature} onChange={handleTimeSignatureChange}>
-            <option value="4/4">4/4</option>
-            <option value="3/4">3/4</option>
-            <option value="5/4">5/4</option>
-            <option value="7/4">7/4</option>
+            <option value="4/4">4分系</option>
+            <option value="3/4">3分系</option>
           </select>
         </div>
         

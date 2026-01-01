@@ -58,11 +58,7 @@ function applyHalfBias01(arr: number[], bias01: number): number[] {
   const n = arr.length;
   const half = Math.floor(n / 2);
 
-  // Count hits
-  let hits = 0;
-  for (let i = 0; i < n; i++) {
-    if (arr[i] === 1) hits++;
-  }
+  const hits = countHits(arr, 0, n);
 
   // Front ratio = 1 - bias01
   // bias01=0   -> front 100%
@@ -71,63 +67,91 @@ function applyHalfBias01(arr: number[], bias01: number): number[] {
   const frontRatio = 1.0 - bias01;
   const targetFront = Math.round(hits * frontRatio);
 
-  // Get center-ordered indices for front and back halves
-  const frontOrder = centerOrder(0, half);
-  const backOrder = centerOrder(half, n - half);
+  const out = arr.slice();
+  const frontHits = countHits(out, 0, half);
+  if (frontHits === targetFront) return out;
 
-  // Clear all, then place front hits, then back hits
-  const out = new Array(n).fill(0);
-  let placed = 0;
+  const sourceStart = frontHits > targetFront ? 0 : half;
+  const sourceLen = frontHits > targetFront ? half : n - half;
+  const destStart = frontHits > targetFront ? half : 0;
+  const destLen = frontHits > targetFront ? n - half : half;
+  const moves = Math.abs(frontHits - targetFront);
 
-  // Place front hits
-  for (let a = 0; a < frontOrder.length && placed < targetFront; a++) {
-    out[frontOrder[a]] = 1;
-    placed++;
-  }
+  for (let i = 0; i < moves; i++) {
+    const sourceHits = rankedHits(out, sourceStart, sourceLen);
+    const destEmpties = rankedEmpties(out, destStart, destLen);
+    if (sourceHits.length === 0 || destEmpties.length === 0) break;
 
-  // Place remaining hits in back
-  for (let b = 0; b < backOrder.length && placed < hits; b++) {
-    out[backOrder[b]] = 1;
-    placed++;
-  }
-
-  // Fallback: place any remaining hits anywhere available
-  if (placed < hits) {
-    for (let i = 0; i < n && placed < hits; i++) {
-      if (out[i] === 0) {
-        out[i] = 1;
-        placed++;
-      }
-    }
+    const sourceIndex = sourceHits[0];
+    const destIndex = destEmpties[0];
+    out[sourceIndex] = 0;
+    out[destIndex] = 1;
   }
 
   return out;
 }
 
 /**
- * Order indices from start..start+len-1 by distance from center
+ * Count hits in range
  */
-function centerOrder(start: number, len: number): number[] {
-  const out: number[] = [];
-  if (len <= 0) return out;
+function countHits(arr: number[], start: number, len: number): number {
+  let hits = 0;
+  for (let i = 0; i < len; i++) {
+    if (arr[start + i] === 1) hits++;
+  }
+  return hits;
+}
 
-  const center = start + (len - 1) / 2.0;
-
-  const tmp: Array<{idx: number, d: number}> = [];
+function rankedHits(arr: number[], start: number, len: number): number[] {
+  const hits: Array<{ idx: number; score: number }> = [];
   for (let i = 0; i < len; i++) {
     const idx = start + i;
-    tmp.push({ idx, d: Math.abs(idx - center) });
+    if (arr[idx] === 1) {
+      hits.push({ idx, score: distanceToNearestHit(arr, idx, start, len, true) });
+    }
   }
 
-  tmp.sort((a, b) => {
-    if (a.d < b.d) return -1;
-    if (a.d > b.d) return 1;
+  hits.sort((a, b) => {
+    if (a.score !== b.score) return a.score - b.score; // remove most crowded
     return a.idx - b.idx;
   });
 
-  for (let k = 0; k < tmp.length; k++) {
-    out.push(tmp[k].idx);
+  return hits.map(item => item.idx);
+}
+
+function rankedEmpties(arr: number[], start: number, len: number): number[] {
+  const empties: Array<{ idx: number; score: number }> = [];
+  for (let i = 0; i < len; i++) {
+    const idx = start + i;
+    if (arr[idx] === 0) {
+      empties.push({ idx, score: distanceToNearestHit(arr, idx, start, len, false) });
+    }
   }
 
-  return out;
+  empties.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score; // fill most open
+    return a.idx - b.idx;
+  });
+
+  return empties.map(item => item.idx);
+}
+
+function distanceToNearestHit(
+  arr: number[],
+  index: number,
+  start: number,
+  len: number,
+  excludeSelf: boolean
+): number {
+  let min = Infinity;
+  for (let i = 0; i < len; i++) {
+    const idx = start + i;
+    if (arr[idx] === 1) {
+      if (excludeSelf && idx === index) continue;
+      const dist = Math.abs(idx - index);
+      if (dist < min) min = dist;
+    }
+  }
+
+  return min === Infinity ? len : min;
 }
