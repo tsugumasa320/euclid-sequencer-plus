@@ -89,6 +89,16 @@ const initialTracks: Track[] = [
   }
 ];
 
+const defaultTransport = {
+  isPlaying: false,
+  bpm: 120,
+  swing: 0,
+  timeSignature: '4/4',
+  currentStep: 0
+};
+
+const defaultMasterVolume = 80;
+
 function App() {
   const [appState, setAppState] = useState<AppState>(() => {
     const tracksWithPatterns = initialTracks.map(track => ({
@@ -102,15 +112,9 @@ function App() {
     }));
 
     return {
-      transport: {
-        isPlaying: false,
-        bpm: 120,
-        swing: 0,
-        timeSignature: '4/4',
-        currentStep: 0
-      },
+      transport: { ...defaultTransport },
       tracks: tracksWithPatterns,
-      masterVolume: 80,
+      masterVolume: defaultMasterVolume,
       selectedTrackId: 'kick'
     };
   });
@@ -163,14 +167,16 @@ function App() {
     audio.triggerTrack(trackId);
   }, [audio]);
 
-  // Handle play/pause
-  useEffect(() => {
+  const handlePlayPause = useCallback(async () => {
     if (appState.transport.isPlaying) {
-      audio.startAudio();
-    } else {
       audio.stopAudio();
+      updateTransport({ isPlaying: false });
+      return;
     }
-  }, [appState.transport.isPlaying, audio]);
+
+    await audio.startAudio();
+    updateTransport({ isPlaying: true });
+  }, [appState.transport.isPlaying, audio, updateTransport]);
 
   // Handle tempo changes
   useEffect(() => {
@@ -196,6 +202,10 @@ function App() {
     appState.tracks.find(t => t.id === appState.selectedTrackId), 
     [appState.tracks, appState.selectedTrackId]
   );
+  const selectedDefaultTrack = useMemo(() => {
+    const found = initialTracks.find(t => t.id === appState.selectedTrackId);
+    return found ?? initialTracks[0];
+  }, [appState.selectedTrackId]);
 
   // Show loading screen while audio is initializing
   if (!audio.isReady) {
@@ -212,8 +222,11 @@ function App() {
         <h1>Euclidean Sequencer Plus</h1>
         <TransportBar 
           transport={appState.transport}
+          defaultTransport={defaultTransport}
+          onTogglePlay={handlePlayPause}
           onUpdate={updateTransport}
           masterVolume={appState.masterVolume}
+          defaultMasterVolume={defaultMasterVolume}
           onMasterVolumeChange={handleMasterVolumeChange}
         />
       </header>
@@ -235,6 +248,7 @@ function App() {
         {selectedTrack && (
           <ControlPanel
             track={selectedTrack}
+            defaultTrack={selectedDefaultTrack}
             onUpdate={(updates) => updateTrack(selectedTrack.id, updates)}
           />
         )}

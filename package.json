@@ -9,9 +9,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist",
-    "test": "echo 'Tests have been removed'",
-    "test:ui": "echo 'Test UI is not available'",
-    "coverage": "echo 'Coverage reporting is disabled'"
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "coverage": "vitest --coverage"
   },
   "dependencies": {
     "react": "^18.2.0",

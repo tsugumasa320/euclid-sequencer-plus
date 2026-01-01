@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { Track, TransportState } from '../types';
 import { DrumMachine } from '../utils/drumSounds';
@@ -24,18 +24,27 @@ export const useAudio = (
   const [currentStep, setCurrentStep] = useState(0);
   const drumMachineRef = useRef<DrumMachine | null>(null);
   const cycleLengthRef = useRef(16);
+  const tracksRef = useRef<Track[]>(tracks);
+  const transportRef = useRef<TransportState>(transport);
+  const onStepChangeRef = useRef<(step: number) => void | undefined>(onStepChange);
   
   // Timing variables - exact copy from moistpeace.com
   const isPlayingRef = useRef(false);
   const currentStepRef = useRef(0);
-  const nextTimeRef = useRef(0);
-  const timerIdRef = useRef<number | null>(null);
-  
-  // Constants from moistpeace.com
-  const lookahead = 0.025; // 25ms
-  const ahead = 0.10;      // 100ms ahead scheduling
+  const scheduleIdRef = useRef<number | null>(null);
 
-  const cycleLength = useMemo(() => calculateCycleLength(tracks, transport.timeSignature), [tracks, transport.timeSignature]);
+  // Keep refs in sync with latest props
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  useEffect(() => {
+    transportRef.current = transport;
+  }, [transport]);
+
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  }, [onStepChange]);
 
   // Initialize audio context and drum machine
   useEffect(() => {
@@ -55,20 +64,18 @@ export const useAudio = (
       if (drumMachineRef.current) {
         drumMachineRef.current.dispose();
       }
-      
-      if (timerIdRef.current) {
-        clearTimeout(timerIdRef.current);
-      }
+
     };
   }, []);
 
   // Keep scheduling cycle aligned with track lengths and time signature
   useEffect(() => {
-    const nextCycle = Math.max(1, cycleLength);
-    cycleLengthRef.current = nextCycle;
-    currentStepRef.current = currentStepRef.current % nextCycle;
-    setCurrentStep(prev => prev % nextCycle);
-  }, [cycleLength]);
+    const nextCycle = calculateCycleLength(tracksRef.current, transportRef.current.timeSignature);
+    const safeCycle = Math.max(1, nextCycle);
+    cycleLengthRef.current = safeCycle;
+    currentStepRef.current = currentStepRef.current % safeCycle;
+    setCurrentStep(prev => prev % safeCycle);
+  }, [tracks, transport.timeSignature]);
 
   // Trigger drum sounds using DrumMachine
   const triggerDrumSound = (trackId: string, volume: number = 0.8, time?: number) => {
@@ -77,29 +84,22 @@ export const useAudio = (
     }
   };
 
-  // nextStep function - exact copy from moistpeace.com
+  // nextStep function - keep step counter in sync with cycle
   const nextStep = useCallback(() => {
-    const bpm = Math.max(40, Math.min(300, transport.bpm)); // clamp between 40-300
-    const swing = Math.max(0, Math.min(0.30, (transport.swing / 100) * 0.30)); // convert swing to ratio
-    
-    const base = 60 / bpm / 4; // base 16th note duration
-    const even = (currentStepRef.current % 2 === 0);
-    const interval = base * (even ? (1 + swing) : (1 - swing));
-    
-    nextTimeRef.current += interval;
     const cycle = Math.max(1, cycleLengthRef.current);
     currentStepRef.current = (currentStepRef.current + 1) % cycle;
-  }, [transport.bpm, transport.swing]);
+  }, []);
 
   // schedule function - exact copy from moistpeace.com
   const schedule = useCallback((step: number, time: number) => {
     const t = Math.max(time, Tone.now() + 0.001);
+    const currentTracks = tracksRef.current;
 
     // Check if any track has solo enabled
-    const hasSolo = tracks.some(track => track.solo);
+    const hasSolo = currentTracks.some(track => track.solo);
     
     // Trigger drums - equivalent to moistpeace.com drum loop
-    tracks.forEach(track => {
+    currentTracks.forEach(track => {
       const stepInPattern = step % track.steps;
       const shouldPlay = !track.muted && 
                        track.pattern[stepInPattern] && 
@@ -113,22 +113,21 @@ export const useAudio = (
 
     // Update step indicators - equivalent to moistpeace.com visual update
     setCurrentStep(step);
-    if (onStepChange) {
-      onStepChange(step);
+    const cb = onStepChangeRef.current;
+    if (cb) {
+      cb(step);
     }
-  }, [tracks, onStepChange, triggerDrumSound]);
+  }, [triggerDrumSound]);
 
-  // Main loop function - exact copy from moistpeace.com
-  const loop = useCallback(() => {
+  useEffect(() => {
     if (!isPlayingRef.current) return;
-    
-    while (nextTimeRef.current < Tone.now() + ahead) {
-      schedule(currentStepRef.current, nextTimeRef.current);
+    if (scheduleIdRef.current === null) return;
+    Tone.Transport.clear(scheduleIdRef.current);
+    scheduleIdRef.current = Tone.Transport.scheduleRepeat((time) => {
+      schedule(currentStepRef.current, time);
       nextStep();
-    }
-    
-    timerIdRef.current = setTimeout(loop, lookahead * 1000); // Convert to ms
-  }, [schedule, nextStep]);
+    }, '16n');
+  }, [tracks, schedule, nextStep]);
 
   const startAudio = useCallback(async (): Promise<void> => {
     if (isPlayingRef.current) return;
@@ -136,27 +135,35 @@ export const useAudio = (
 
     try {
       await Tone.start();
+      Tone.Transport.bpm.value = transportRef.current.bpm;
+      Tone.Transport.swing = transportRef.current.swing / 100;
+      Tone.Transport.swingSubdivision = '16n';
 
       // Initialize timing variables - exact copy from moistpeace.com
       isPlayingRef.current = true;
       currentStepRef.current = currentStepRef.current % Math.max(1, cycleLengthRef.current);
-      nextTimeRef.current = Tone.now();
 
-      // Start the main loop
-      loop();
+      // Schedule using Tone.Transport to survive scroll throttling
+      if (scheduleIdRef.current === null) {
+        scheduleIdRef.current = Tone.Transport.scheduleRepeat((time) => {
+          schedule(currentStepRef.current, time);
+          nextStep();
+        }, '16n');
+      }
+      Tone.Transport.start();
     } catch (error) {
       console.error('Failed to start audio:', error);
     }
-  }, [isReady, loop]);
+  }, [isReady, schedule, nextStep]);
 
   const stopAudio = useCallback(() => {
     isPlayingRef.current = false;
 
-    // Clear timer
-    if (timerIdRef.current) {
-      clearTimeout(timerIdRef.current);
-      timerIdRef.current = null;
+    if (scheduleIdRef.current !== null) {
+      Tone.Transport.clear(scheduleIdRef.current);
+      scheduleIdRef.current = null;
     }
+    Tone.Transport.stop();
 
     currentStepRef.current = 0;
     setCurrentStep(0);

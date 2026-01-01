@@ -4,21 +4,23 @@ import './TransportBar.css';
 
 interface TransportBarProps {
   transport: TransportState;
+  defaultTransport: TransportState;
+  onTogglePlay: () => void | Promise<void>;
   onUpdate: (updates: Partial<TransportState>) => void;
   masterVolume: number;
+  defaultMasterVolume: number;
   onMasterVolumeChange: (volume: number) => void;
 }
 
 const TransportBar: React.FC<TransportBarProps> = ({
   transport,
+  defaultTransport,
+  onTogglePlay,
   onUpdate,
   masterVolume,
+  defaultMasterVolume,
   onMasterVolumeChange
 }) => {
-  const handlePlayPause = () => {
-    onUpdate({ isPlaying: !transport.isPlaying });
-  };
-
   const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({ bpm: parseInt(e.target.value) });
   };
@@ -31,12 +33,24 @@ const TransportBar: React.FC<TransportBarProps> = ({
     onUpdate({ timeSignature: e.target.value });
   };
 
+  const resetBpm = () => {
+    onUpdate({ bpm: defaultTransport.bpm });
+  };
+
+  const resetSwing = () => {
+    onUpdate({ swing: defaultTransport.swing });
+  };
+
+  const resetMasterVolume = () => {
+    onMasterVolumeChange(defaultMasterVolume);
+  };
+
   return (
     <div className="transport-bar">
       <div className="transport-controls">
         <button 
           className={`play-button ${transport.isPlaying ? 'playing' : ''}`}
-          onClick={handlePlayPause}
+          onClick={onTogglePlay}
         >
           {transport.isPlaying ? '⏸️' : '▶️'}
         </button>
@@ -49,6 +63,7 @@ const TransportBar: React.FC<TransportBarProps> = ({
             max="200"
             value={transport.bpm}
             onChange={handleBpmChange}
+            onDoubleClick={resetBpm}
           />
           <span>{transport.bpm}</span>
         </div>
@@ -61,6 +76,7 @@ const TransportBar: React.FC<TransportBarProps> = ({
             max="100"
             value={transport.swing}
             onChange={handleSwingChange}
+            onDoubleClick={resetSwing}
           />
           <span>{transport.swing}%</span>
         </div>
@@ -83,6 +99,7 @@ const TransportBar: React.FC<TransportBarProps> = ({
             max="100"
             value={masterVolume}
             onChange={(e) => onMasterVolumeChange(parseInt(e.target.value))}
+            onDoubleClick={resetMasterVolume}
           />
           <span>{masterVolume}</span>
         </div>

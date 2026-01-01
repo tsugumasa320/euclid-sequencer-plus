@@ -27,9 +27,12 @@ const TrackCircle: React.FC<TrackCircleProps> = ({
   const radius = 80;
   const centerX = 100;
   const centerY = 100;
+  const safeSteps = Math.max(1, track.steps);
+  const pattern = Array.isArray(track.pattern) ? track.pattern : [];
+  const stepsPattern = pattern.length > 0 ? pattern : new Array(safeSteps).fill(false);
   
-  const steps = track.pattern.map((active, index) => {
-    const angle = (index / track.steps) * 2 * Math.PI - Math.PI / 2;
+  const steps = stepsPattern.map((active, index) => {
+    const angle = (index / safeSteps) * 2 * Math.PI - Math.PI / 2;
     const x = centerX + radius * Math.cos(angle);
     const y = centerY + radius * Math.sin(angle);
     
@@ -37,7 +40,7 @@ const TrackCircle: React.FC<TrackCircleProps> = ({
       x,
       y,
       active,
-      isCurrent: index === currentStep % track.steps
+      isCurrent: index === currentStep % safeSteps
     };
   });
 
@@ -104,7 +107,7 @@ const TrackCircle: React.FC<TrackCircleProps> = ({
           fontWeight="bold"
           className="current-step-text"
         >
-          {(currentStep % track.steps) + 1}
+          {track.steps > 0 ? (currentStep % safeSteps) + 1 : 0}
         </text>
       </svg>
       

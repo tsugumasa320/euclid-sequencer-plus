@@ -4,10 +4,11 @@ import './ControlPanel.css';
 
 interface ControlPanelProps {
   track: Track;
+  defaultTrack: Track;
   onUpdate: (updates: Partial<Track>) => void;
 }
 
-const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
+const ControlPanel: React.FC<ControlPanelProps> = ({ track, defaultTrack, onUpdate }) => {
   const handleStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const steps = parseInt(e.target.value);
     onUpdate({ steps, hits: Math.min(track.hits, steps) });
@@ -35,6 +36,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
 
   const handleSoloToggle = () => {
     onUpdate({ solo: !track.solo });
+  };
+
+  const resetSteps = () => {
+    const steps = defaultTrack.steps;
+    onUpdate({ steps, hits: Math.min(track.hits, steps) });
+  };
+
+  const resetHits = () => {
+    onUpdate({ hits: Math.min(defaultTrack.hits, track.steps) });
+  };
+
+  const resetBias = () => {
+    onUpdate({ bias: defaultTrack.bias });
+  };
+
+  const resetRotation = () => {
+    onUpdate({ rotation: defaultTrack.rotation });
+  };
+
+  const resetVolume = () => {
+    onUpdate({ volume: defaultTrack.volume });
   };
 
   const getBiasLabel = (bias: number) => {
@@ -73,6 +95,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
               max="32"
               value={track.steps}
               onChange={handleStepsChange}
+              onDoubleClick={resetSteps}
             />
             <span>{track.steps}</span>
           </div>
@@ -87,6 +110,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
               max={track.steps}
               value={track.hits}
               onChange={handleHitsChange}
+              onDoubleClick={resetHits}
             />
             <span>{track.hits}</span>
           </div>
@@ -102,6 +126,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
               step="0.1"
               value={track.bias}
               onChange={handleBiasChange}
+              onDoubleClick={resetBias}
             />
             <span>{getBiasLabel(track.bias)}</span>
           </div>
@@ -116,6 +141,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
               max={track.steps}
               value={track.rotation}
               onChange={handleRotationChange}
+              onDoubleClick={resetRotation}
             />
             <span>{track.rotation > 0 ? '+' : ''}{track.rotation}</span>
           </div>
@@ -130,6 +156,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ track, onUpdate }) => {
               max="100"
               value={track.volume}
               onChange={handleVolumeChange}
+              onDoubleClick={resetVolume}
             />
             <span>{track.volume}%</span>
           </div>
